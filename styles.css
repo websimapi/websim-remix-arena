@@ -56,3 +56,17 @@ body {
     transform: scale(0.98);
 }
 
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Safe area for bottom nav on mobile */
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
