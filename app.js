@@ -27,7 +27,7 @@ const Header = ({ vault }) => {
     );
 };
 
-const ImageCard = ({ data, onRemix }) => {
+const ImageCard = ({ data, onRemix, onDelete, isOwner }) => {
     const isRemix = data.type === 'remix';
     
     return (
@@ -39,6 +39,20 @@ const ImageCard = ({ data, onRemix }) => {
                     <div className="absolute top-2 right-2 bg-purple-600 text-xs px-2 py-1 rounded shadow-lg font-bold">
                         REMIXED
                     </div>
+                )}
+                
+                {isOwner && onDelete && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if(confirm("Delete this creation? This cannot be undone.")) {
+                                onDelete(data);
+                            }
+                        }}
+                        className="absolute top-2 left-2 bg-red-600/80 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
+                    >
+                        <i className="fa-solid fa-trash-can text-xs"></i>
+                    </button>
                 )}
             </div>
             
@@ -207,7 +221,7 @@ const BottomNav = ({ activeTab, onTabChange, onCreate }) => {
     );
 };
 
-const ProfileView = ({ vault, onRemix }) => {
+const ProfileView = ({ vault, onRemix, onDelete }) => {
     if (!vault) return (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
             <div className="loader mb-4 border-purple-500 border-b-transparent"></div>
@@ -222,6 +236,7 @@ const ProfileView = ({ vault, onRemix }) => {
         const gens = (vault.col_1?.generations || []).map(g => ({
             ...g,
             id: (g.id || Math.random().toString()) + '_p',
+            originalId: g.id,
             type: 'generation',
             imageUrl: g.url,
             authorName: username,
@@ -231,6 +246,7 @@ const ProfileView = ({ vault, onRemix }) => {
         const remixes = (vault.col_2?.remixes || []).map(r => ({
             ...r,
             id: (r.id || Math.random().toString()) + '_p',
+            originalId: r.id,
             type: 'remix',
             imageUrl: r.url,
             sourceUrl: r.source,
@@ -281,7 +297,12 @@ const ProfileView = ({ vault, onRemix }) => {
                 <div className="columns-1 sm:columns-2 gap-4">
                     {items.map(item => (
                         <div key={item.id} className="break-inside-avoid">
-                            <ImageCard data={item} onRemix={onRemix} />
+                            <ImageCard 
+                                data={item} 
+                                onRemix={onRemix} 
+                                onDelete={onDelete}
+                                isOwner={true}
+                            />
                         </div>
                     ))}
                 </div>
@@ -295,6 +316,7 @@ const ProfileView = ({ vault, onRemix }) => {
 const App = () => {
     const [vault, setVault] = useState(null);
     const [feed, setFeed] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const [currentView, setCurrentView] = useState('feed');
     const [isGenModalOpen, setIsGenModalOpen] = useState(false);
     const [remixTarget, setRemixTarget] = useState(null); // null or image object
@@ -302,6 +324,9 @@ const App = () => {
     useEffect(() => {
         // Initialize User Data
         const init = async () => {
+            const user = await window.websim.getCurrentUser();
+            setCurrentUser(user);
+
             await DataStore.getMyVault(); // Ensure vault exists
             
             // Subscribe to vault changes (currency/gems)
@@ -331,6 +356,10 @@ const App = () => {
         }
     };
 
+    const handleDelete = async (item) => {
+        await DataStore.deleteItem(item.originalId, item.type);
+    };
+
     const openRemix = (imageRecord) => {
         setRemixTarget(imageRecord);
     };
@@ -350,13 +379,18 @@ const App = () => {
                         <div className="columns-1 sm:columns-2 gap-4 animate-fade-in">
                             {feed.map(item => (
                                 <div key={item.id} className="break-inside-avoid">
-                                    <ImageCard data={item} onRemix={openRemix} />
+                                    <ImageCard 
+                                        data={item} 
+                                        onRemix={openRemix} 
+                                        isOwner={currentUser && item.authorName === currentUser.username}
+                                        onDelete={handleDelete}
+                                    />
                                 </div>
                             ))}
                         </div>
                     )
                 ) : (
-                    <ProfileView vault={vault} onRemix={openRemix} />
+                    <ProfileView vault={vault} onRemix={openRemix} onDelete={handleDelete} />
                 )}
             </main>
 

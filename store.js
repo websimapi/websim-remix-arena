@@ -253,6 +253,40 @@ const DataStore = {
         return updatedCol2;
     },
 
+    // Delete an item
+    async deleteItem(originalId, type) {
+        let vault = await this.getMyVault();
+        const user = await window.websim.getCurrentUser();
+        
+        if (type === 'generation') {
+            const newGens = (vault.col_1.generations || []).filter(g => g.id !== originalId);
+            vault.col_1 = {
+                ...vault.col_1,
+                generations: newGens,
+                currency: newGens.length * 10
+            };
+        } else if (type === 'remix') {
+            const newRemixes = (vault.col_2.remixes || []).filter(r => r.id !== originalId);
+            vault.col_2 = {
+                ...vault.col_2,
+                remixes: newRemixes,
+                gems: newRemixes.length * 5
+            };
+        }
+
+        // Update Local
+        await IDB.put(vault);
+
+        // Update Remote
+        const remoteList = await room.collection(DB_CONSTANTS.COLLECTION).filter({ username: user.username }).getList();
+        if (remoteList.length > 0) {
+            await room.collection(DB_CONSTANTS.COLLECTION).update(remoteList[0].id, {
+                col_1: vault.col_1,
+                col_2: vault.col_2
+            });
+        }
+    },
+
     subscribeToFeed(callback) {
         // Construct feed by aggregating from all user vaults
         // Note: Feed doesn't use IndexedDB, it's live from server for social aspect
@@ -267,7 +301,8 @@ const DataStore = {
                 if (vault.col_1 && Array.isArray(vault.col_1.generations)) {
                     vault.col_1.generations.forEach(gen => {
                         allItems.push({
-                            id: gen.id + "_" + vault.id, 
+                            id: gen.id + "_" + vault.id,
+                            originalId: gen.id,
                             type: 'generation',
                             imageUrl: gen.url,
                             prompt: gen.prompt,
@@ -284,6 +319,7 @@ const DataStore = {
                     vault.col_2.remixes.forEach(remix => {
                         allItems.push({
                             id: remix.id + "_" + vault.id,
+                            originalId: remix.id,
                             type: 'remix',
                             imageUrl: remix.url,
                             prompt: remix.prompt,
