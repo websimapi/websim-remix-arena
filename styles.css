@@ -52,6 +52,12 @@ body {
 .image-card {
     transition: transform 0.2s;
 }
+/* Long press selection prevention */
+.select-none {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
 .image-card:active {
     transform: scale(0.98);
 }

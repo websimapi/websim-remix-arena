@@ -27,33 +27,54 @@ const Header = ({ vault }) => {
     );
 };
 
-const ImageCard = ({ data, onRemix, onDelete, isOwner }) => {
+const ImageCard = ({ data, onRemix, onDelete, isOwner, onDetail }) => {
     const isRemix = data.type === 'remix';
-    
+    const timerRef = useRef(null);
+    const isLongPress = useRef(false);
+
+    const handleStart = () => {
+        isLongPress.current = false;
+        timerRef.current = setTimeout(() => {
+            isLongPress.current = true;
+            if (navigator.vibrate) navigator.vibrate(50);
+            if (onDetail) onDetail(data);
+        }, 500);
+    };
+
+    const handleEnd = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const handleContextMenu = (e) => {
+        // Prevent default context menu on images to allow for long-press interaction
+        e.preventDefault();
+    };
+
     return (
-        <div className="image-card relative group rounded-xl overflow-hidden bg-gray-800 mb-4 border border-gray-700">
+        <div 
+            className="image-card relative group rounded-xl overflow-hidden bg-gray-800 mb-4 border border-gray-700 select-none transition-transform active:scale-[0.98]"
+            onMouseDown={handleStart}
+            onMouseUp={handleEnd}
+            onMouseLeave={handleEnd}
+            onTouchStart={handleStart}
+            onTouchEnd={handleEnd}
+            onTouchMove={handleEnd}
+            onContextMenu={handleContextMenu}
+        >
             <div className="relative aspect-square">
-                <img src={data.imageUrl} alt={data.prompt} className="w-full h-full object-cover" />
+                <img src={data.imageUrl} alt={data.prompt} className="w-full h-full object-cover pointer-events-none" />
                 
                 {isRemix && (
-                    <div className="absolute top-2 right-2 bg-purple-600 text-xs px-2 py-1 rounded shadow-lg font-bold">
+                    <div className="absolute top-2 right-2 bg-purple-600/90 backdrop-blur text-xs px-2 py-1 rounded shadow-lg font-bold border border-purple-400/50">
                         REMIXED
                     </div>
                 )}
-                
-                {isOwner && onDelete && (
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if(confirm("Delete this creation? This cannot be undone.")) {
-                                onDelete(data);
-                            }
-                        }}
-                        className="absolute top-2 left-2 bg-red-600/80 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
-                    >
-                        <i className="fa-solid fa-trash-can text-xs"></i>
-                    </button>
-                )}
+
+                {/* Long press hint overlay */}
+                <div className="absolute inset-0 bg-black/0 active:bg-black/10 transition-colors pointer-events-none"></div>
             </div>
             
             <div className="p-3">
@@ -63,8 +84,11 @@ const ImageCard = ({ data, onRemix, onDelete, isOwner }) => {
                         <span className="text-xs text-gray-300 font-semibold truncate max-w-[100px]">{data.authorName}</span>
                     </div>
                     <button 
-                        onClick={() => onRemix(data)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onRemix(data);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors z-20"
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Remix
                     </button>

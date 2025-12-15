@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const ProfileView = ({ vault, onRemix, onDelete }) => {
+const ProfileView = ({ vault, onRemix, onDelete, onDetail }) => {
     if (!vault) return (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
             <div className="loader mb-4 border-purple-500 border-b-transparent"></div>
@@ -81,6 +81,7 @@ const ProfileView = ({ vault, onRemix, onDelete }) => {
                                 onRemix={onRemix} 
                                 onDelete={onDelete}
                                 isOwner={true}
+                                onDetail={onDetail}
                             />
                         </div>
                     ))}

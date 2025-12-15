@@ -23,6 +23,7 @@ const App = () => {
     const [currentView, setCurrentView] = useState('feed');
     const [isGenModalOpen, setIsGenModalOpen] = useState(false);
     const [remixTarget, setRemixTarget] = useState(null); // null or image object
+    const [detailItem, setDetailItem] = useState(null); // For detail view
 
     useEffect(() => {
         // Initialize User Data
@@ -67,6 +68,10 @@ const App = () => {
         setRemixTarget(imageRecord);
     };
 
+    const openDetail = (item) => {
+        setDetailItem(item);
+    };
+
     return (
         <div className="h-screen flex flex-col bg-gray-900">
             <Header vault={vault} />
@@ -87,13 +92,19 @@ const App = () => {
                                         onRemix={openRemix} 
                                         isOwner={currentUser && item.authorName === currentUser.username}
                                         onDelete={handleDelete}
+                                        onDetail={openDetail}
                                     />
                                 </div>
                             ))}
                         </div>
                     )
                 ) : (
-                    <ProfileView vault={vault} onRemix={openRemix} onDelete={handleDelete} />
+                    <ProfileView 
+                        vault={vault} 
+                        onRemix={openRemix} 
+                        onDelete={handleDelete} 
+                        onDetail={openDetail}
+                    />
                 )}
             </main>
 
@@ -117,6 +128,15 @@ const App = () => {
                 type="remix"
                 sourceImage={remixTarget}
                 onComplete={handleRemixComplete}
+            />
+
+            <DetailModal 
+                isOpen={!!detailItem}
+                onClose={() => setDetailItem(null)}
+                item={detailItem}
+                isOwner={currentUser && detailItem && detailItem.authorName === currentUser.username}
+                onRemix={openRemix}
+                onDelete={handleDelete}
             />
         </div>
     );
