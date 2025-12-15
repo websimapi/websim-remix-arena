@@ -91,6 +91,7 @@ const DataStore = {
         
         let mergedGenerations = [];
         let mergedRemixes = [];
+        let mergedTransactions = [];
         
         // Sources
         const remoteGens = remoteRecord?.col_1?.generations || [];
@@ -99,13 +100,29 @@ const DataStore = {
         const remoteRemixes = remoteRecord?.col_2?.remixes || [];
         const localRemixes = localRecord?.col_2?.remixes || [];
 
+        const remoteTrans = remoteRecord?.col_3?.transactions || [];
+        const localTrans = localRecord?.col_3?.transactions || [];
+
         // Merge
         mergedGenerations = mergeArrays(remoteGens, localGens);
         mergedRemixes = mergeArrays(remoteRemixes, localRemixes);
+        mergedTransactions = mergeArrays(remoteTrans, localTrans);
 
-        // Recalculate Currency based on verified data
-        const currency = mergedGenerations.length * 10;
-        const gems = mergedRemixes.length * 5;
+        // Decoupled Currency Logic:
+        // Use stored values primarily to separate currency from item existence (deletions don't reduce currency)
+        const localCurr = localRecord?.col_1?.currency;
+        const remoteCurr = remoteRecord?.col_1?.currency;
+        
+        let currency = (localCurr !== undefined || remoteCurr !== undefined) 
+            ? Math.max(localCurr || 0, remoteCurr || 0)
+            : mergedGenerations.length * 10; // Fallback for migration
+
+        const localGems = localRecord?.col_2?.gems;
+        const remoteGems = remoteRecord?.col_2?.gems;
+
+        let gems = (localGems !== undefined || remoteGems !== undefined)
+            ? Math.max(localGems || 0, remoteGems || 0)
+            : mergedRemixes.length * 5; // Fallback for migration
 
         // Construct Merged State
         const mergedState = {
@@ -121,15 +138,25 @@ const DataStore = {
             col_2: {
                 remixes: mergedRemixes,
                 gems: gems
+            },
+            col_3: {
+                transactions: mergedTransactions
             }
         };
 
         // 1. Patch Remote if needed (Remote is missing items)
-        if (remoteRecord && (mergedGenerations.length > remoteGens.length || mergedRemixes.length > remoteRemixes.length)) {
+        if (remoteRecord && (
+            mergedGenerations.length > remoteGens.length || 
+            mergedRemixes.length > remoteRemixes.length ||
+            mergedTransactions.length > remoteTrans.length ||
+            currency > (remoteRecord.col_1?.currency || 0) ||
+            gems > (remoteRecord.col_2?.gems || 0)
+        )) {
             console.log("Sync: Patching Remote DB with missing items...");
             await room.collection(DB_CONSTANTS.COLLECTION).update(remoteRecord.id, {
                 col_1: mergedState.col_1,
-                col_2: mergedState.col_2
+                col_2: mergedState.col_2,
+                col_3: mergedState.col_3
             });
         }
 
@@ -194,14 +221,28 @@ const DataStore = {
             date: new Date().toISOString()
         };
 
+        // Transaction Log
+        const newTrans = {
+            id: 'tx_gen_' + Date.now(),
+            type: 'generation_reward',
+            amount: 10,
+            date: new Date().toISOString()
+        };
+
         const updatedCol1 = {
             ...vault.col_1,
             generations: [newGen, ...(vault.col_1.generations || [])],
             currency: (vault.col_1.currency || 0) + 10
         };
 
+        const updatedCol3 = {
+            ...vault.col_3,
+            transactions: [newTrans, ...(vault.col_3?.transactions || [])]
+        };
+
         // Optimistic Update Local
         vault.col_1 = updatedCol1;
+        vault.col_3 = updatedCol3;
         await IDB.put(vault);
 
         // Update Remote
@@ -209,7 +250,8 @@ const DataStore = {
         const remoteList = await room.collection(DB_CONSTANTS.COLLECTION).filter({ username: user.username }).getList();
         if (remoteList.length > 0) {
             await room.collection(DB_CONSTANTS.COLLECTION).update(remoteList[0].id, {
-                col_1: updatedCol1
+                col_1: updatedCol1,
+                col_3: updatedCol3
             });
         }
 
@@ -232,21 +274,36 @@ const DataStore = {
             date: new Date().toISOString()
         };
 
+        // Transaction Log
+        const newTrans = {
+            id: 'tx_remix_' + Date.now(),
+            type: 'remix_reward',
+            amount: 5,
+            date: new Date().toISOString()
+        };
+
         const updatedCol2 = {
             ...vault.col_2,
             remixes: [newRemix, ...(vault.col_2.remixes || [])],
             gems: (vault.col_2.gems || 0) + 5
         };
 
+        const updatedCol3 = {
+            ...vault.col_3,
+            transactions: [newTrans, ...(vault.col_3?.transactions || [])]
+        };
+
         // Optimistic Local
         vault.col_2 = updatedCol2;
+        vault.col_3 = updatedCol3;
         await IDB.put(vault);
 
         // Update Remote
         const remoteList = await room.collection(DB_CONSTANTS.COLLECTION).filter({ username: user.username }).getList();
         if (remoteList.length > 0) {
             await room.collection(DB_CONSTANTS.COLLECTION).update(remoteList[0].id, {
-                col_2: updatedCol2
+                col_2: updatedCol2,
+                col_3: updatedCol3
             });
         }
 
@@ -263,14 +320,14 @@ const DataStore = {
             vault.col_1 = {
                 ...vault.col_1,
                 generations: newGens,
-                currency: newGens.length * 10
+                currency: vault.col_1.currency // Keep existing currency
             };
         } else if (type === 'remix') {
             const newRemixes = (vault.col_2.remixes || []).filter(r => r.id !== originalId);
             vault.col_2 = {
                 ...vault.col_2,
                 remixes: newRemixes,
-                gems: newRemixes.length * 5
+                gems: vault.col_2.gems // Keep existing gems
             };
         }
 
