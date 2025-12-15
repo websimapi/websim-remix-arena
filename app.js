@@ -137,6 +137,8 @@ const App = () => {
                 isOwner={currentUser && detailItem && detailItem.authorName === currentUser.username}
                 onRemix={openRemix}
                 onDelete={handleDelete}
+                feed={feed}
+                onSwitch={openDetail}
             />
         </div>
     );

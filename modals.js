@@ -1,6 +1,37 @@
 const { useState, useEffect, useRef } = React;
 
-const DetailModal = ({ isOpen, onClose, item, isOwner, onRemix, onDelete }) => {
+const DetailModal = ({ isOpen, onClose, item, isOwner, onRemix, onDelete, feed, onSwitch }) => {
+    const contentRef = useRef(null);
+    const [treeData, setTreeData] = useState(null);
+
+    // Scroll to top when item changes
+    useEffect(() => {
+        if (contentRef.current) contentRef.current.scrollTop = 0;
+    }, [item?.id]);
+
+    // Calculate Remix Tree Data
+    useEffect(() => {
+        if (isOpen && item && item.type === 'remix' && feed) {
+            // Find parent
+            const parent = feed.find(i => i.imageUrl === item.sourceUrl) || {
+                imageUrl: item.sourceUrl,
+                isGhost: true,
+                authorName: 'Unknown Source'
+            };
+            
+            // Find siblings (other remixes of the same source)
+            const siblings = feed.filter(i => 
+                i.type === 'remix' && 
+                i.sourceUrl === item.sourceUrl && 
+                i.id !== item.id
+            ).sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+
+            setTreeData({ parent, siblings });
+        } else {
+            setTreeData(null);
+        }
+    }, [item, feed, isOpen]);
+
     if (!isOpen || !item) return null;
 
     return (
@@ -21,7 +52,7 @@ const DetailModal = ({ isOpen, onClose, item, isOwner, onRemix, onDelete }) => {
                 </div>
 
                 {/* Content */}
-                <div className="overflow-y-auto flex-1 p-4 scrollbar-hide">
+                <div ref={contentRef} className="overflow-y-auto flex-1 p-4 scrollbar-hide">
                     <div className="rounded-xl overflow-hidden border border-gray-700 bg-black mb-4 shadow-lg relative">
                         <img src={item.imageUrl} className="w-full h-auto object-contain max-h-[50vh] mx-auto" />
                         {item.type === 'remix' && (
@@ -37,12 +68,61 @@ const DetailModal = ({ isOpen, onClose, item, isOwner, onRemix, onDelete }) => {
                     </div>
 
                     {item.type === 'remix' && (
-                         <div className="mt-4 flex items-center gap-2 text-xs text-purple-400 bg-purple-900/10 p-3 rounded border border-purple-500/20">
-                            <i className="fa-solid fa-code-branch text-lg"></i>
-                            <div>
-                                <span className="font-bold block">Remix Tree</span>
-                                <span className="opacity-70">This image was remixed from another creation.</span>
+                         <div className="mt-4 text-xs text-purple-400 bg-purple-900/10 p-3 rounded border border-purple-500/20">
+                            <div className="flex items-center gap-2 mb-3">
+                                <i className="fa-solid fa-code-branch text-lg"></i>
+                                <div>
+                                    <span className="font-bold block">Remix Tree</span>
+                                    <span className="opacity-70">Timeline of variations from the original source.</span>
+                                </div>
                             </div>
+
+                            {treeData && (
+                                <div className="flex items-center gap-3 overflow-x-auto pb-4 pt-2 scrollbar-hide snap-x px-1">
+                                    {/* Parent */}
+                                    <div 
+                                        className={`flex-shrink-0 relative group snap-start ${!treeData.parent.isGhost ? 'cursor-pointer' : 'opacity-50'}`}
+                                        onClick={() => !treeData.parent.isGhost && onSwitch(treeData.parent)}
+                                    >
+                                        <div className="w-14 h-14 rounded-lg border border-purple-500/30 overflow-hidden">
+                                            <img src={treeData.parent.imageUrl} className="w-full h-full object-cover" />
+                                        </div>
+                                        <span className="absolute -bottom-4 left-0 right-0 text-center text-[9px] font-bold uppercase tracking-wider text-purple-300">Source</span>
+                                        {!treeData.parent.isGhost && <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg"></div>}
+                                    </div>
+
+                                    <i className="fa-solid fa-angle-right text-purple-500/30"></i>
+
+                                    {/* Current (You) */}
+                                    <div className="flex-shrink-0 relative snap-center">
+                                        <div className="w-16 h-16 rounded-xl border-2 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)] overflow-hidden relative z-10">
+                                            <img src={item.imageUrl} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 ring-1 ring-inset ring-white/20"></div>
+                                        </div>
+                                        <span className="absolute -bottom-5 left-0 right-0 text-center text-[10px] font-bold uppercase tracking-wider text-white">You</span>
+                                    </div>
+
+                                    {treeData.siblings.length > 0 && <i className="fa-solid fa-angle-right text-purple-500/30"></i>}
+
+                                    {/* Siblings */}
+                                    {treeData.siblings.map((sib, idx) => (
+                                        <React.Fragment key={sib.id}>
+                                            {idx > 0 && <div className="w-px h-4 bg-purple-500/20"></div>}
+                                            <div 
+                                                className="flex-shrink-0 relative group cursor-pointer snap-start"
+                                                onClick={() => onSwitch(sib)}
+                                            >
+                                                <div className="w-14 h-14 rounded-lg border border-purple-500/30 overflow-hidden opacity-60 group-hover:opacity-100 transition-all group-hover:scale-105 group-hover:border-purple-400">
+                                                    <img src={sib.imageUrl} className="w-full h-full object-cover" />
+                                                </div>
+                                                <span className="absolute -bottom-4 left-0 right-0 text-center text-[8px] font-mono text-purple-300/50 truncate px-1 group-hover:text-purple-300">
+                                                    {new Date(sib.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                </span>
+                                            </div>
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            )}
                          </div>
                     )}
                 </div>
