@@ -249,8 +249,8 @@ const DataStore = {
                         allItems.push({
                             id: gen.id + "_" + vault.id, 
                             type: 'generation',
-                            imageUrl: gen.url,
-                            prompt: gen.prompt,
+                            imageUrl: gen.url || '',
+                            prompt: gen.prompt || 'Untitled',
                             date: gen.date,
                             authorName,
                             authorAvatar,
@@ -265,9 +265,9 @@ const DataStore = {
                         allItems.push({
                             id: remix.id + "_" + vault.id,
                             type: 'remix',
-                            imageUrl: remix.url,
-                            prompt: remix.prompt,
-                            sourceUrl: remix.source,
+                            imageUrl: remix.url || '',
+                            prompt: remix.prompt || 'Untitled',
+                            sourceUrl: remix.source || '',
                             date: remix.date,
                             authorName,
                             authorAvatar,
