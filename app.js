@@ -64,23 +64,16 @@ const ImageCard = ({ data, onRemix }) => {
 const GeneratorModal = ({ isOpen, onClose, type, sourceImage, onComplete }) => {
     const [prompt, setPrompt] = useState("");
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    // Reset error when modal opens
-    useEffect(() => {
-        if (isOpen) setError(null);
-    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError(null);
         
         try {
             const finalPrompt = type === 'remix' 
-                ? `Remix this image: ${prompt}` 
+                ? `Remix of existing image, ${prompt}` 
                 : prompt;
 
             const options = {
@@ -88,28 +81,21 @@ const GeneratorModal = ({ isOpen, onClose, type, sourceImage, onComplete }) => {
                 aspect_ratio: "1:1"
             };
 
-            // If remixing, convert source URL to base64
+            // If remixing, we need to convert the source URL to base64 first or send it if supported.
+            // Using standard imageGen. If remixing, we use image_inputs
             if (type === 'remix' && sourceImage) {
-                if (!sourceImage.imageUrl) throw new Error("Source image URL is missing");
-
-                try {
-                    const response = await fetch(sourceImage.imageUrl);
-                    if (!response.ok) throw new Error(`Failed to load image: ${response.statusText}`);
-                    
-                    const blob = await response.blob();
-                    
-                    const base64Data = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.onerror = () => reject(new Error("Failed to read image data"));
-                        reader.readAsDataURL(blob);
-                    });
-
-                    options.image_inputs = [{ url: base64Data }];
-                } catch (imgErr) {
-                    console.error("Image processing error:", imgErr);
-                    throw new Error("Could not process source image. It might be inaccessible/private.");
-                }
+                 // Fetch blob to get base64 
+                 const resp = await fetch(sourceImage.imageUrl);
+                 const blob = await resp.blob();
+                 const reader = new FileReader();
+                 
+                 await new Promise((resolve) => {
+                     reader.onloadend = () => {
+                        options.image_inputs = [{ url: reader.result }];
+                        resolve();
+                     };
+                     reader.readAsDataURL(blob);
+                 });
             }
 
             const result = await websim.imageGen(options);
@@ -123,8 +109,8 @@ const GeneratorModal = ({ isOpen, onClose, type, sourceImage, onComplete }) => {
             onClose();
             setPrompt("");
         } catch (err) {
-            console.error("Generation failed:", err);
-            setError(err.message || "Generation failed. Please try again.");
+            console.error(err);
+            alert("Generation failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -147,13 +133,6 @@ const GeneratorModal = ({ isOpen, onClose, type, sourceImage, onComplete }) => {
                         <div className="absolute inset-0 flex items-center justify-center">
                             <span className="bg-black/50 px-2 py-1 rounded text-xs">Source Image</span>
                         </div>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded-lg mb-4 text-sm flex items-start gap-2">
-                        <i className="fa-solid fa-triangle-exclamation mt-1"></i>
-                        <span>{error}</span>
                     </div>
                 )}
 

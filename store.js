@@ -47,6 +47,20 @@ const IDB = {
     }
 };
 
+// Helper: Uploads temporary AI generation URLs to permanent storage
+const persistImage = async (tempUrl) => {
+    try {
+        const response = await fetch(tempUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `gen_${Date.now()}.png`, { type: 'image/png' });
+        const url = await window.websim.upload(file);
+        return url;
+    } catch (e) {
+        console.error("Upload failed, falling back to temp URL:", e);
+        return tempUrl;
+    }
+};
+
 // Initialize empty structure for columns 3-19
 const getEmptyColumns = () => {
     let cols = {};
@@ -165,7 +179,10 @@ const DataStore = {
     },
 
     // Add a new generation
-    async addGeneration(imageUrl, prompt) {
+    async addGeneration(tempImageUrl, prompt) {
+        // Persist image first to get a clean, permanent URL
+        const imageUrl = await persistImage(tempImageUrl);
+
         // Sync first to ensure we have latest state
         let vault = await this.getMyVault();
         const user = await window.websim.getCurrentUser();
@@ -200,7 +217,10 @@ const DataStore = {
     },
 
     // Add a remix
-    async addRemix(remixUrl, prompt, originalSourceUrl) {
+    async addRemix(tempRemixUrl, prompt, originalSourceUrl) {
+        // Persist image first to get a clean, permanent URL
+        const remixUrl = await persistImage(tempRemixUrl);
+
         let vault = await this.getMyVault();
         const user = await window.websim.getCurrentUser();
 
@@ -249,8 +269,8 @@ const DataStore = {
                         allItems.push({
                             id: gen.id + "_" + vault.id, 
                             type: 'generation',
-                            imageUrl: gen.url || '',
-                            prompt: gen.prompt || 'Untitled',
+                            imageUrl: gen.url,
+                            prompt: gen.prompt,
                             date: gen.date,
                             authorName,
                             authorAvatar,
@@ -265,9 +285,9 @@ const DataStore = {
                         allItems.push({
                             id: remix.id + "_" + vault.id,
                             type: 'remix',
-                            imageUrl: remix.url || '',
-                            prompt: remix.prompt || 'Untitled',
-                            sourceUrl: remix.source || '',
+                            imageUrl: remix.url,
+                            prompt: remix.prompt,
+                            sourceUrl: remix.source,
                             date: remix.date,
                             authorName,
                             authorAvatar,
